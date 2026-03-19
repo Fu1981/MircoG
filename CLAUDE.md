@@ -882,14 +882,14 @@ create trigger on_game_session_completed
 ### `.env.local` (Next.js Frontend)
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://zvlbunssipacmmirygas.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
 
 ### Supabase Edge Functions Secrets
 
 ```bash
-supabase secrets set SUPABASE_URL=https://xxxx.supabase.co
+supabase secrets set SUPABASE_URL=https://zvlbunssipacmmirygas.supabase.co
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJ...
 supabase secrets set SUPABASE_ANON_KEY=eyJ...
 supabase secrets set ALLOWED_ORIGIN=https://app.screenway.io
