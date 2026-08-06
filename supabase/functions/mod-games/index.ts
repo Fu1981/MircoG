@@ -145,6 +145,9 @@ serve(async (req) => {
     } else if (game.slug === 'mines') {
       const minePositions = generateMinePositions()
       serverMetadata = { mine_positions: minePositions }
+    } else if (game.slug === 'stopwatch') {
+      const cfg = game.config as { target_ms?: number }
+      serverMetadata = { target_ms: cfg.target_ms ?? 10000 }
     }
 
     // Session anlegen
@@ -194,7 +197,12 @@ serve(async (req) => {
   if (sessionEndMatch && req.method === 'POST') {
     const sessionId = sessionEndMatch[1]
 
-    let body: { result: 'win' | 'loss' | 'cashout'; cashout_multiplier?: number; safe_cells?: number }
+    let body: {
+      result: 'win' | 'loss' | 'cashout'
+      cashout_multiplier?: number
+      safe_cells?: number
+      stopped_ms?: number
+    }
     try {
       body = await req.json()
     } catch {
@@ -208,7 +216,7 @@ serve(async (req) => {
 
     const { data: session } = await supabase
       .from('game_sessions')
-      .select('id, player_id, game_id, bet_points, result, metadata')
+      .select('id, player_id, game_id, bet_points, result, metadata, created_at')
       .eq('id', sessionId)
       .eq('player_id', player.id)
       .single()
@@ -226,6 +234,7 @@ serve(async (req) => {
 
     // Gewinn berechnen
     let winPoints = 0
+    let finalResult: 'win' | 'loss' | 'cashout' = body.result
     const serverMeta = (session.metadata ?? {}) as Record<string, unknown>
 
     if (body.result === 'win' || body.result === 'cashout') {
@@ -247,6 +256,35 @@ serve(async (req) => {
         const safeCells = body.safe_cells ?? 0
         if (safeCells < 0) return err(400, 'invalid_safe_cells', 'safe_cells must be >= 0')
         winPoints = Math.floor(session.bet_points * (1 + safeCells * 0.5))
+      } else if (game.slug === 'stopwatch') {
+        // Skill-Spiel: Client meldet die gestoppte Zeit, Server bestimmt die Auszahlung.
+        if (typeof body.stopped_ms !== 'number' || body.stopped_ms < 0) {
+          return err(400, 'invalid_stopped_ms', 'stopped_ms must be a non-negative number')
+        }
+        const cfg = game.config as {
+          target_ms?: number
+          tiers?: Array<{ max_dev_ms: number; multiplier: number }>
+        }
+        const targetMs = cfg.target_ms ?? 10000
+
+        // Anti-Cheat: gemeldete Zeit darf die real vergangene Session-Zeit nicht übersteigen.
+        const serverElapsed = Date.now() - new Date(session.created_at as string).getTime()
+        if (body.stopped_ms > serverElapsed + 1500) {
+          return err(400, 'implausible_time', 'Reported stop time exceeds elapsed session time')
+        }
+
+        const deviation = Math.abs(body.stopped_ms - targetMs)
+        const tier = [...(cfg.tiers ?? [])]
+          .sort((a, b) => a.max_dev_ms - b.max_dev_ms)
+          .find((t) => deviation <= t.max_dev_ms)
+        const multiplier = tier?.multiplier ?? 0
+
+        winPoints = Math.floor(session.bet_points * multiplier)
+        finalResult = winPoints > 0 ? 'win' : 'loss'
+        serverMeta.stopped_ms = body.stopped_ms
+        serverMeta.deviation_ms = deviation
+        serverMeta.target_ms = targetMs
+        serverMeta.multiplier = multiplier
       }
     }
 
@@ -254,7 +292,7 @@ serve(async (req) => {
     const { error: updateError } = await supabase
       .from('game_sessions')
       .update({
-        result: body.result,
+        result: finalResult,
         win_points: winPoints,
         metadata: { ...serverMeta, client_result: body.result },
       })
@@ -302,9 +340,17 @@ serve(async (req) => {
     return ok(
       {
         session_id: sessionId,
-        result: body.result,
+        result: finalResult,
         win_points: winPoints,
         ...(game.slug === 'crash' ? { crash_point: serverMeta.crash_point } : {}),
+        ...(game.slug === 'stopwatch'
+          ? {
+              stopped_ms: serverMeta.stopped_ms,
+              deviation_ms: serverMeta.deviation_ms,
+              target_ms: serverMeta.target_ms,
+              multiplier: serverMeta.multiplier,
+            }
+          : {}),
       },
       MODULE
     )

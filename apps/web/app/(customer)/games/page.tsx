@@ -6,11 +6,13 @@ import { useWallet } from '@/lib/hooks/useWallet'
 import CrashGame from '@/components/games/CrashGame'
 import ScratchCard from '@/components/games/ScratchCard'
 import MinesGame from '@/components/games/MinesGame'
+import StopwatchGame from '@/components/games/StopwatchGame'
 
 const GAME_EMOJI: Record<string, string> = {
   crash: '📈',
   scratch: '🎟️',
   mines: '💣',
+  stopwatch: '⏱️',
 }
 
 export default function GamesPage() {
@@ -49,6 +51,9 @@ export default function GamesPage() {
         )}
         {selectedGame.slug === 'mines' && (
           <MinesGame game={selectedGame} onEnd={handleGameEnd} />
+        )}
+        {selectedGame.slug === 'stopwatch' && (
+          <StopwatchGame game={selectedGame} onEnd={handleGameEnd} />
         )}
       </div>
     )
@@ -101,6 +106,7 @@ export default function GamesPage() {
                   {game.slug === 'crash' && 'Steige rechtzeitig aus, bevor der Kurs abstürzt!'}
                   {game.slug === 'scratch' && '3 gleiche Symbole = 4× Einsatz Gewinn!'}
                   {game.slug === 'mines' && 'Decke sichere Felder auf — jedes bringt mehr Gewinn!'}
+                  {game.slug === 'stopwatch' && 'Stoppe die Uhr exakt bei 10,000 s — je genauer, desto mehr Gewinn!'}
                 </div>
               </div>
             )

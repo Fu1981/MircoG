@@ -21,6 +21,11 @@ export interface SessionEndResult {
   result: 'win' | 'loss' | 'cashout'
   win_points: number
   crash_point?: number
+  // Stopwatch-spezifisch
+  stopped_ms?: number
+  deviation_ms?: number
+  target_ms?: number
+  multiplier?: number
 }
 
 export const gamesApi = {
@@ -32,7 +37,7 @@ export const gamesApi = {
   endSession: (
     sessionId: string,
     result: 'win' | 'loss' | 'cashout',
-    options?: { cashout_multiplier?: number; safe_cells?: number }
+    options?: { cashout_multiplier?: number; safe_cells?: number; stopped_ms?: number }
   ) =>
     apiPost<SessionEndResult>(`/mod-games/session/${sessionId}/end`, { result, ...options }),
 
